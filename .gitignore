@@ -1,0 +1,15 @@
+# Ignore compiled executables and object files
+*.o
+*.out
+*.exe
+*.a
+*.so
+
+# Ignore build directories
+build/
+bin/
+obj/
+
+# Ignore the makefile-generated files
+matrixMultiply
+eigenMatrixMult
