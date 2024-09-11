@@ -45,3 +45,8 @@ This repository includes the solutions and source code for the lab exercises:
 ├── lab5/  # Introduction to OpenCL programming
 │   └── CImg/
 └── lab6/  # Heterogeneous Programming in OpenCL
+```
+
+## Additional Resources
+
+For more information on the exercises and course materials, you can refer to the official repository of the University of Zaragoza for the PACS course: [University of Zaragoza PACS Repository](https://github.com/universidad-zaragoza/PACS/wiki)
