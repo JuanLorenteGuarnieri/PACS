@@ -1,87 +1,99 @@
 #include <iostream>
 #include <vector>
-#include <cstdlib>  // For rand()
-#include <chrono>   // For measuring time
-#include <cmath>    // For sqrt() and pow()
+#include <random>
+#include <chrono>
+#include <cmath>
 
-// Function to multiply two matrices
-void matrixMultiply(const std::vector<std::vector<double>>& A,
-                    const std::vector<std::vector<double>>& B,
-                    std::vector<std::vector<double>>& C) {
-    size_t N = A.size();
-    for (size_t i = 0; i < N; ++i) {
-        for (size_t j = 0; j < N; ++j) {
-            C[i][j] = 0;
-            for (size_t k = 0; k < N; ++k) {
-                C[i][j] += A[i][k] * B[k][j];
+// Function to generate a random matrix with size rows x cols
+std::vector<std::vector<double>> generateMatrix(int rows, int cols) {
+    std::vector<std::vector<double>> matrix(rows, std::vector<double>(cols));
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(0.0, 10.0); // Random numbers between 0 and 10
+
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            matrix[i][j] = dis(gen);
+        }
+    }
+
+    return matrix;
+}
+
+// Function to multiply two matrices A (NxM) and B (MxN), result will be NxN
+std::vector<std::vector<double>> multiplyMatrices(const std::vector<std::vector<double>>& A, const std::vector<std::vector<double>>& B) {
+    int N = A.size();
+    int M = A[0].size();
+    std::vector<std::vector<double>> result(N, std::vector<double>(N, 0.0));
+
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            for (int k = 0; k < M; ++k) {
+                result[i][j] += A[i][k] * B[k][j];
             }
         }
     }
+
+    return result;
 }
 
-// Function to generate a random matrix
-void generateRandomMatrix(std::vector<std::vector<double>>& matrix, size_t N) {
-    matrix.resize(N, std::vector<double>(N));
-    for (size_t i = 0; i < N; ++i) {
-        for (size_t j = 0; j < N; ++j) {
-            matrix[i][j] = static_cast<double>(rand()) / RAND_MAX; // Random value between 0 and 1
-        }
-    }
-}
-
-// Function to calculate the standard deviation
-double calculateStandardDeviation(const std::vector<double>& times, double mean) {
+// Function to compute mean of a vector
+double computeMean(const std::vector<double>& times) {
     double sum = 0.0;
     for (double time : times) {
-        sum += std::pow(time - mean, 2);
+        sum += time;
     }
-    return std::sqrt(sum / times.size());
+    return sum / times.size();
+}
+
+// Function to compute standard deviation of a vector
+double computeStdDev(const std::vector<double>& times, double mean) {
+    double variance = 0.0;
+    for (double time : times) {
+        variance += (time - mean) * (time - mean);
+    }
+    return std::sqrt(variance / times.size());
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <matrix_size> <num_repetitions>" << std::endl;
+    int N, M, K;
+   
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <matrix_size> <num_repetitions> <num_matrices>" << std::endl;
         return 1;
     }
+    
+    N = std::stoi(argv[1]);
+    M = std::stoi(argv[2]);
+    K = std::stoi(argv[3]);
 
-    size_t N = std::stoul(argv[1]);  // Matrix size
-    size_t M = std::stoul(argv[2]);  // Number of repetitions
+    std::vector<double> times; // To store times of each multiplication
 
-    std::vector<std::vector<double>> A, B, C;
+    for (int i = 0; i < K; ++i) {
+        // Generate random matrices A (NxM) and B (MxN)
+        std::vector<std::vector<double>> A = generateMatrix(N, M);
+        std::vector<std::vector<double>> B = generateMatrix(M, N);
 
-    // Variable to accumulate total duration
-    std::vector<double> durations;
-    double totalDuration = 0.0;
+        // Start time measurement
+        auto start = std::chrono::high_resolution_clock::now();
 
-    // Run matrix multiplication m times and calculate average time
-    for (size_t i = 0; i < M; ++i) {
-        // Generate random matrices
-        generateRandomMatrix(A, N);
-        generateRandomMatrix(B, N);
-        C.resize(N, std::vector<double>(N));
+        // Multiply matrices
+        std::vector<std::vector<double>> C = multiplyMatrices(A, B);
 
-        // Measure time for this iteration
-        auto start = std::chrono::high_resolution_clock::now(); // Start time
+        // End time measurement
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
 
-        matrixMultiply(A, B, C); // Perform matrix multiplication
-
-        auto end = std::chrono::high_resolution_clock::now(); // End time
-        std::chrono::duration<double> duration = end - start; // Duration
-
-        // Accumulate total duration
-        durations.push_back(duration.count());
-        totalDuration += duration.count();
+        // Store the elapsed time in seconds
+        times.push_back(elapsed.count());
     }
 
-    // Calculate average duration
-    double averageDuration = totalDuration / M;
+    // Compute mean and standard deviation of times
+    double mean = computeMean(times);
+    double stdDev = computeStdDev(times, mean);
 
-    // Calculate standard deviation of the durations
-    double stddev = calculateStandardDeviation(durations, averageDuration);
-
-    std::cout << "Total execution time over: " << totalDuration << " seconds" << std::endl;
-    std::cout << "Average execution time over " << M << " runs: " << averageDuration << " seconds" << std::endl;
-    std::cout << "Standard deviation of execution times: " << stddev << " seconds" << std::endl;
+    std::cout << "Average time taken for matrix multiplication: " << mean << " seconds\n";
+    std::cout << "Standard deviation of time: " << stdDev << " seconds\n";
 
     return 0;
 }
