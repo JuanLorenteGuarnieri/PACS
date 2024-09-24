@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
     int N, M, K;
    
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <matrix_size> <num_repetitions> <num_matrices>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <matrix_size_rows> <matrix_size_columns> <num_repetitions>" << std::endl;
         return 1;
     }
     

@@ -9,7 +9,8 @@
 build/
 bin/
 obj/
+.vscode
 
 # Ignore the makefile-generated files
-matrixMultiply
+standardMatrixMult
 eigenMatrixMult
