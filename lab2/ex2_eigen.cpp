@@ -1,11 +1,10 @@
-#include <iostream>
 #include <Eigen/Dense> // Ensure Eigen is correctly included
+#include <iostream>
 #include <sys/time.h> // For gettimeofday()
+#include <cmath>      // For sqrt() and pow()
+#include <random>
 #include <vector>     // For std::vector
 
-// Function to generate random Eigen matrices
-void generateEigenMatrices(Eigen::MatrixXd& A, Eigen::MatrixXd& B, size_t N, size_t M) {
-}
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
@@ -17,27 +16,51 @@ int main(int argc, char* argv[]) {
     size_t M = std::stoul(argv[2]);  // Number of columns in the first matrix (and rows in the second)
     size_t k = std::stoul(argv[3]);  // Number of repetitions
 
-    // Measuring time for matrix initialization
+    // Variable to accumulate total duration
+    std::vector<double> durations_init, durations_mult;
     struct timeval start, end;
-    
-    gettimeofday(&start, NULL);
-    Eigen::MatrixXd A = Eigen::MatrixXd::Random(N, M); // Matrix A with random values
-    Eigen::MatrixXd B = Eigen::MatrixXd::Random(M, N); // Matrix B with random values
-    gettimeofday(&end, NULL);
-    double initDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
 
-    Eigen::MatrixXd C; // Result matrix
-
-    // Measuring time for matrix multiplication
-    gettimeofday(&start, NULL);
     for (size_t i = 0; i < k; ++i) {
-        C = A * B; // Matrix multiplication using Eigen
-    }
-    gettimeofday(&end, NULL);
-    double multDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        // Start time measurement
+        gettimeofday(&start, NULL);
 
-    std::cout << "Initialization time: " << initDuration << " seconds\n";
-    std::cout << "Multiplication time over " << k << " runs: " << multDuration << " seconds\n";
+        // Using Eigen's MatrixXd for dynamic size matrices
+        Eigen::MatrixXd A = Eigen::MatrixXd::Random(N, M); // Matrix A with random values
+        Eigen::MatrixXd B = Eigen::MatrixXd::Random(M, N); // Matrix B with random values
+
+        gettimeofday(&end, NULL);
+        double initDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        durations_init.push_back(initDuration);
+
+        // Perform matrix multiplication using Eigen
+
+        gettimeofday(&start, NULL);
+        // Perform matrix multiplication using Eigen
+        Eigen::MatrixXd C = A * B;
+
+        // End time measurement        
+        gettimeofday(&end, NULL);
+
+        
+        // Calculate elapsed time
+        double multDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        durations_mult.push_back(multDuration);
+    }
+
+    // Calculate average duration
+    double totalDuration = 0.0;
+    for (const double& time : durations_init) {
+        totalDuration += time;
+    }
+    double averageDuration_init = totalDuration / k;
+    totalDuration = 0.0;
+    for (const double& time : durations_mult) {
+        totalDuration += time;
+    }
+    double averageDuration_mult = totalDuration / k;
+
+    std::cout << "Initialization time: " << averageDuration_init << " seconds\n";
+    std::cout << "Multiplication time: " << averageDuration_mult << " seconds\n";
 
     return 0;
 }

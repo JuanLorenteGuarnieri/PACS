@@ -1,8 +1,8 @@
 #include <iostream>
-#include <vector>
-#include <random>
 #include <sys/time.h> // For gettimeofday()
 #include <cmath>      // For sqrt() and pow()
+#include <random>
+#include <vector>     // For std::vector
 
 // Function to generate a random matrix with size rows x cols
 std::vector<std::vector<double>> generateMatrix(int rows, int cols) {
@@ -37,39 +37,61 @@ std::vector<std::vector<double>> multiplyMatrices(const std::vector<std::vector<
     return result;
 }
 
+
 int main(int argc, char* argv[]) {
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <matrix_size_rows> <matrix_size_columns> <num_repetitions>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <N> <M> <k>" << std::endl;
         return 1;
     }
 
-    int N = std::stoi(argv[1]);
-    int M = std::stoi(argv[2]);
-    int K = std::stoi(argv[3]);
+    size_t N = std::stoul(argv[1]);  // Number of rows in the resulting matrix
+    size_t M = std::stoul(argv[2]);  // Number of columns in the first matrix (and rows in the second)
+    size_t k = std::stoul(argv[3]);  // Number of repetitions
 
-    // Measuring time for matrix initialization
+    // Variable to accumulate total duration
+    std::vector<double> durations_init, durations_mult;
     struct timeval start, end;
 
-    // Generate random matrices
-    gettimeofday(&start, NULL);
-    std::vector<std::vector<double>> A = generateMatrix(N, M);
-    std::vector<std::vector<double>> B = generateMatrix(M, N);
-    gettimeofday(&end, NULL);
-    double initDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+    for (size_t i = 0; i < k; ++i) {
+        // Start time measurement
+        gettimeofday(&start, NULL);
 
-    // Prepare result matrix
-    std::vector<std::vector<double>> C(N, std::vector<double>(N, 0.0));
+        // Using Eigen's MatrixXd for dynamic size matrices
+        std::vector<std::vector<double>> A = generateMatrix(N, M);
+        std::vector<std::vector<double>> B = generateMatrix(M, N);
 
-    // Measuring time for matrix multiplication
-    gettimeofday(&start, NULL);
-    for (int i = 0; i < K; ++i) {
+        gettimeofday(&end, NULL);
+        double initDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        durations_init.push_back(initDuration);
+
+        // Perform matrix multiplication using Eigen
+
+        gettimeofday(&start, NULL);
         std::vector<std::vector<double>> C = multiplyMatrices(A, B);
-    }
-    gettimeofday(&end, NULL);
-    double multDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
 
-    std::cout << "Initialization time: " << initDuration << " seconds\n";
-    std::cout << "Multiplication time over " << K << " runs: " << multDuration << " seconds\n";
+        // End time measurement        
+        gettimeofday(&end, NULL);
+
+        
+        // Calculate elapsed time
+        double multDuration = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        durations_mult.push_back(multDuration);
+    }
+
+    // Calculate average duration
+    double totalDuration = 0.0;
+    for (const double& time : durations_init) {
+        totalDuration += time;
+    }
+    double averageDuration_init = totalDuration / k;
+    totalDuration = 0.0;
+    for (const double& time : durations_mult) {
+        totalDuration += time;
+    }
+    double averageDuration_mult = totalDuration / k;
+
+    std::cout << "Initialization time: " << averageDuration_init << " seconds\n";
+    std::cout << "Multiplication time: " << averageDuration_mult << " seconds\n";
 
     return 0;
 }
