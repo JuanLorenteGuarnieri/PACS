@@ -245,12 +245,26 @@ int main(int argc, char *argv[]){
 
     auto *c_ptr = c.get(); // raw pointer to Vector c
 
-    // create a thread pool
+    // Create a thread pool with the desired number of threads
+    thread_pool pool(std::thread::hardware_concurrency()); // Use default thread count
 
-    // launch the tasks
+    // Launch the tasks: split work into regions (for example, by rows or tiles)
+    for (size_t x = 0; x < w; x += w / w_div) {
+        for (size_t y = 0; y < h; y += h / h_div) {
+            // Define the region to render (xmin, xmax, ymin, ymax)
+            Region reg(x, std::min(x + w / w_div, w), y, std::min(y + h / h_div, h));
+            
+            // Submit each render task to the thread pool
+            pool.submit([=] {
+                render(w, h, samps, cam, cx, cy, c_ptr, reg); // Render region
+            });
+        }
+    }
 
+    // Wait for completion of all tasks
+    pool.wait();
 
-    // wait for completion
+    // Stop measuring time
     auto stop = std::chrono::steady_clock::now();
     std::cout << "Execution time: " <<
       std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count() << " ms." << std::endl;
