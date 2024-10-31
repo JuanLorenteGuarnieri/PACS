@@ -10,6 +10,7 @@
 class thread_pool
 {
     std::atomic_bool done;                     // Flag to indicate when the pool should stop
+    std::atomic_int working;
     threadsafe_queue<std::function<void()>> work_queue; // Thread-safe queue for storing tasks
     std::vector<std::thread> threads;          // Worker threads
     join_threads _joiner;                      // Helper to join threads when the pool is destroyed
@@ -17,13 +18,30 @@ class thread_pool
     // Worker function for each thread
     void worker_thread()
     {
+        bool notified_working = false;
+
         while (!done)
         {
             std::function<void()> task;
+            
             // Try to pop a task from the queue. If no task is available, yield control to the OS.
-            if (work_queue.try_pop(task)) {
+            if (work_queue.try_pop(task)) 
+            {
+                if (!notified_working) {
+                    working++;
+                    notified_working = true;
+                }
+
                 task(); // Execute the task
-            } else {
+            } 
+            else 
+            {
+                if (notified_working)
+                {
+                    working--;
+                    notified_working = false;
+                }
+                
                 std::this_thread::yield(); // Yield if no task is available
             }
         }
@@ -32,7 +50,7 @@ class thread_pool
 public:
     // Constructor initializes the pool with a specified number of threads (default is hardware concurrency)
     thread_pool(size_t num_threads = std::thread::hardware_concurrency())
-        : done(false), _joiner(threads) // Initialize the done flag and joiner
+        : done(false), working(0), _joiner(threads) // Initialize the done flag and joiner
     {
         try {
             // Create worker threads
@@ -50,13 +68,13 @@ public:
     ~thread_pool()
     {
         done = true;  // Signal all threads to finish
-        // wait();       // Ensure all tasks are completed
+        wait();       // Ensure all tasks are completed
     }
 
     // Wait for all tasks to complete (active waiting)
     void wait()
     {
-        while (!work_queue.empty()) {
+        while (!work_queue.empty() || working > 0) {
             std::this_thread::yield(); // Active wait by yielding until the queue is empty
         }
     }

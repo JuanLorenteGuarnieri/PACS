@@ -32,26 +32,42 @@ public:
     void push(T new_value)
     {
         std::lock_guard<std::mutex> lock(mtx); // Lock the mutex before modifying the queue
-        data_queue.push(std::move(new_value)); // Push the new task into the queue
-        data_cond.notify_one(); // Notify one waiting thread that new data is available
+        data_queue.push(new_value); // Push the new task into the queue
+        //data_cond.notify_one(); // Notify one waiting thread that new data is available
     }
 
     // Try to pop a value from the queue without blocking
     bool try_pop(T& value)
     {
         std::lock_guard<std::mutex> lock(mtx); // Lock the mutex
+        
         if (data_queue.empty()) // If the queue is empty, return false
-            return false;
-        value = std::move(data_queue.front()); // Get the front element
+            return false;        
+
+        value = data_queue.front(); // Get the front element
         data_queue.pop(); // Remove it from the queue
+        
         return true;
     }
+
+    
+    // Check if the queue is empty
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> lock(mtx); // Lock the mutex
+        return data_queue.empty(); // Check if the underlying queue is empty
+    }
+
+    /*
 
     // Block until an item is available and then pop it
     void wait_and_pop(T& value)
     {
         std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
-        data_cond.wait(lock, [this]{ return !data_queue.empty(); }); // Wait for data to be available
+        
+        if (data_queue.empty()) // If the queue is empty, wait for data
+            data_cond.wait(lock, [this]{ return !data_queue.empty(); }); // Wait for data to be available
+        
         value = std::move(data_queue.front()); // Get the front element
         data_queue.pop(); // Remove it from the queue
     }
@@ -60,16 +76,13 @@ public:
     std::shared_ptr<T> wait_and_pop()
     {
         std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
-        data_cond.wait(lock, [this]{ return !data_queue.empty(); }); // Wait for data
+
+        if (data_queue.empty()) // If the queue is empty, wait for data
+            data_cond.wait(lock, [this]{ return !data_queue.empty(); }); // Wait for data
+        
         std::shared_ptr<T> res(std::make_shared<T>(std::move(data_queue.front()))); // Create shared_ptr to front element
         data_queue.pop(); // Remove the element from the queue
         return res;
     }
-
-    // Check if the queue is empty
-    bool empty() const
-    {
-        std::lock_guard<std::mutex> lock(mtx); // Lock the mutex
-        return data_queue.empty(); // Check if the underlying queue is empty
-    }
+    */
 };

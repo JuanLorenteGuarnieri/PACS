@@ -249,8 +249,10 @@ int main(int argc, char *argv[]){
     thread_pool pool(std::thread::hardware_concurrency()); // Use default thread count
 
     // Launch the tasks: split work into regions (for example, by rows or tiles)
-    for (size_t x = 0; x < w; x += w / w_div) {
-        for (size_t y = 0; y < h; y += h / h_div) {
+    for (size_t x = 0; x < w; x += w / w_div) 
+    {
+        for (size_t y = 0; y < h; y += h / h_div) 
+        {
             // Define the region to render (xmin, xmax, ymin, ymax)
             Region reg(x, std::min(x + w / w_div, w), y, std::min(y + h / h_div, h));
             
