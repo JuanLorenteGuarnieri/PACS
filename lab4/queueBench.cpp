@@ -5,7 +5,7 @@
 #include <condition_variable>
 #include <vector>
 
-#include <lockFreeQueue.hpp>
+#include <threadsafe_queue.hpp>
 
 // Producer function
 void producer(threadsafe_queue<int> &sharedQueue, int id, long long numItems) {
