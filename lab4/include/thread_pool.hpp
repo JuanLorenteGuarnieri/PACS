@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <functional>
 #include <vector>
 #include <thread>
@@ -11,6 +13,10 @@ class thread_pool
 {
     std::atomic_bool done;                     // Flag to indicate when the pool should stop
     std::atomic_int working;
+    
+    std::mutex mtx;                            // Mutex to protect shared data
+    std::condition_variable cond_finished;         // Condition variable for coordination between threads
+    
     threadsafe_queue<std::function<void()>> work_queue; // Thread-safe queue for storing tasks
     std::vector<std::thread> threads;          // Worker threads
     join_threads _joiner;                      // Helper to join threads when the pool is destroyed
@@ -41,7 +47,10 @@ class thread_pool
                     working--;
                     notified_working = false;
                 }
-                
+
+                if (working == 0)
+                    cond_finished.notify_all(); // Notify all threads that no more tasks are available
+
                 std::this_thread::yield(); // Yield if no task is available
             }
         }
@@ -74,9 +83,9 @@ public:
     // Wait for all tasks to complete (active waiting)
     void wait()
     {
-        while (!work_queue.empty() || working > 0) {
-            std::this_thread::yield(); // Active wait by yielding until the queue is empty
-        }
+        // wait until all threads are finished
+        std::unique_lock<std::mutex> lock(mtx);
+        cond_finished.wait(lock, [this]{ return work_queue.empty() && working == 0; });
     }
 
     // Submit a new task to the pool

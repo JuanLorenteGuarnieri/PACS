@@ -33,7 +33,7 @@ public:
     {
         std::lock_guard<std::mutex> lock(mtx); // Lock the mutex before modifying the queue
         data_queue.push(new_value); // Push the new task into the queue
-        //data_cond.notify_one(); // Notify one waiting thread that new data is available
+        data_cond.notify_one(); // Notify one waiting thread that new data is available
     }
 
     // Try to pop a value from the queue without blocking
@@ -57,8 +57,6 @@ public:
         std::lock_guard<std::mutex> lock(mtx); // Lock the mutex
         return data_queue.empty(); // Check if the underlying queue is empty
     }
-
-    /*
 
     // Block until an item is available and then pop it
     void wait_and_pop(T& value)
@@ -84,5 +82,4 @@ public:
         data_queue.pop(); // Remove the element from the queue
         return res;
     }
-    */
 };
