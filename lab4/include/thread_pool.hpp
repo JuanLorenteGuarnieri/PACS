@@ -7,7 +7,7 @@
 #include <vector>
 #include <thread>
 #include "join_threads.hpp"
-#include "lockFreeQueue.hpp"
+#include "threadsafe_queue.hpp"
 
 class thread_pool
 {
