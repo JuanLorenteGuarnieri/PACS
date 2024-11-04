@@ -24,11 +24,6 @@ public:
     // Wait for all tasks to complete (active waiting)
     void wait()
     {
-        for (auto& f : futures)
-        {
-            f.get();
-        }
-
         futures.clear();
     }
 
