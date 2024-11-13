@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string>
+
 #ifdef __APPLE__
   #include <OpenCL/opencl.h>
 #else
@@ -72,7 +74,7 @@ int main(int argc, char** argv)
     clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_PROFILE, sizeof(str_buffer), str_buffer, NULL);
     printf("\t\tPlatform Profile: %s\n", str_buffer);
 
-    clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_HOST_TIMER_RESOLUTION, &e_buf, &e_buf, NULL);
+    clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_HOST_TIMER_RESOLUTION, sizeof(e_buf), &e_buf, NULL);
     printf("\t\tHost Timer Resolution: %zu\n", e_buf);
   }
   printf("\n");
@@ -121,13 +123,64 @@ int main(int argc, char** argv)
 
   // 3. Create a context, with a device
   cl_context_properties properties[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platforms_ids[0], 0}; // Using the first platform
-  context = clCreateContext(properties, n_devices[0], devices_ids[0], NULL, &err);
+  context = clCreateContext(properties, n_devices[0], devices_ids[0], NULL, NULL, &err);
   cl_error(err, "Failed to create a compute context\n");
 
   // 4. Create a command queue
   cl_command_queue_properties proprt[] = { CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0 };
   command_queue = clCreateCommandQueueWithProperties(context, devices_ids[0][0], proprt, &err); // Using the first device
   cl_error(err, "Failed to create a command queue\n");
+
+
+  std::string KernelSource = "__kernel void pow_of_two("
+        "__global float *in,"
+        "__global float *out,"
+        "const unsigned int count){"
+
+        "int i = get_global_id(/***???***/);"
+
+        "printf(\"%d\\n\", i);"
+
+        "if(i < count){"
+        "  out[i] = in[i] * in[i];"
+        "}"
+      "}";
+
+  auto fileSize = KernelSource.size();
+
+  auto Program = clCreateProgramWithSource(context, 1, (const char **) &KernelSource, &fileSize, &err);
+  cl_error(err, "Failed to create a program with source\n");
+
+  clBuildProgram(Program, 0, NULL, NULL, NULL, NULL);
+
+  auto Kernel = clCreateKernel(Program, "pow_of_two", &err);
+
+  const size_t count = 10;
+  float in[count];
+  float out[count];
+
+  for (int i = 0; i < count; i++){
+    in[i] = i;
+  }
+
+  cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
+  cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * count, NULL, &err);
+
+  clSetKernelArg(Kernel, 0, sizeof(cl_mem), &input);
+  clSetKernelArg(Kernel, 1, sizeof(cl_mem), &output);
+  clSetKernelArg(Kernel, 2, sizeof(unsigned int), &count);
+
+  clEnqueueWriteBuffer(command_queue, input, CL_TRUE, 0, sizeof(float) * count, in, 0, NULL, NULL);
+  clEnqueueNDRangeKernel(command_queue, Kernel, 1, NULL, &count, NULL, 0, NULL, NULL);
+  clEnqueueReadBuffer(command_queue, output, CL_TRUE, 0, sizeof(float) * 10, out, 0, NULL, NULL);
+
+  // Wait for the command queue to finish
+  clFinish(command_queue);
+
+
+  for(int i = 0; i < 10; i++){
+    printf("%f\n", out[i]);
+  }
 
   // Clean up resources (optional, but good practice)
   clReleaseCommandQueue(command_queue);

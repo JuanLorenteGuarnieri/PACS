@@ -7,3 +7,5 @@ mkdir -p ./bin
 g++ example.cpp -o ./bin/example -I "./CImg" -lm -lpthread -lX11 -ljpeg
 g++ task1.cpp -o ./bin/task1 -I "./CImg" -lm -lpthread -lX11 -ljpeg
 g++ task2.cpp -o ./bin/task2 -I "./CImg" -lm -lpthread -lX11 -ljpeg
+g++ basic_environ.c -o ./bin/basic_environ -I "./CImg" -lm -lpthread -lX11 -ljpeg -lOpenCL
+
