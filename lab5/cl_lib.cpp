@@ -205,6 +205,123 @@ public:
     }
 
 
+    std::string s_convolution() const
+    {
+        std::string convolution_code = "__kernel void convolution("
+            "__global float *matrix,"
+            "__global float *kernel,"
+            "__global float *out,"
+            "const unsigned int rows,"
+            "const unsigned int cols,"
+            "const unsigned int kernel_rows,"
+            "const unsigned int kernel_cols){"
+
+            "int i = get_global_id(0);"
+            "int j = get_global_id(1);"
+
+            "if(i < rows && j < cols){"
+            "  float sum = 0;"
+            "  for (int k = 0; k < kernel_rows; k++){"
+            "    for (int l = 0; l < kernel_cols; l++){"
+            "      sum += matrix[(i+k)*cols + j+l] * kernel[k*kernel_cols + l];"
+            "    }"
+            "  }"
+            "  out[i*cols + j] = sum;"
+            "}"
+            "}";    
+    }
+
+
+    std::vector<std::vector<float>> convolution(
+            std::vector<std::vector<float>> &matrix, 
+            std::vector<std::vector<float>> &kernel)
+    {
+        std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
+        std::vector<float> flattenKernel(kernel.size()*kernel[0].size());
+
+        for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t j = 0; j < matrix[0].size(); j++){
+                flattenMatrix[i*matrix[0].size() + j] = matrix[i][j];
+            }
+        }
+
+        for (size_t i = 0; i < kernel.size(); i++){
+            for (size_t j = 0; j < kernel[0].size(); j++){
+                flattenKernel[i*kernel[0].size() + j] = kernel[i][j];
+            }
+        }
+
+        cl_int err;
+
+        size_t count = matrix.size()*matrix[0].size();                 
+        Cl_function f = createFunction("convolution", s_convolution());
+
+        auto flatten_result = runConvolutionFunction(f, flattenMatrix, flattenKernel, matrix.size(), matrix[0].size(), kernel.size(), kernel[0].size());
+    
+        std::vector<std::vector<float>> result(matrix.size(), std::vector<float>(matrix[0].size()));
+
+        for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t j = 0; j < matrix[0].size(); j++){
+                result[i][j] = flatten_result[i*matrix[0].size() + j];
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<float> runConvolutionFunction(Cl_function &f, std::vector<float> &matrix, 
+            std::vector<float> &kernel, size_t rows, size_t cols, 
+            size_t kernel_rows, size_t kernel_cols)
+    {
+        cl_int err;
+        size_t count = rows*cols;
+        std::vector<float> out(count);
+
+        cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+        cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+        cl_mem kernel_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * kernel.size(), NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+
+        err = clSetKernelArg(f.get(), 0, sizeof(cl_mem), &input);
+        cl_error(err, "Failed to set kernel arg 0\n");
+        err = clSetKernelArg(f.get(), 1, sizeof(cl_mem), &kernel_buffer);
+        cl_error(err, "Failed to set kernel arg 1\n");
+        err = clSetKernelArg(f.get(), 2, sizeof(cl_mem), &output);
+        cl_error(err, "Failed to set kernel arg 2\n");
+        err = clSetKernelArg(f.get(), 3, sizeof(unsigned int), &rows);
+        cl_error(err, "Failed to set kernel arg 3\n");
+        err = clSetKernelArg(f.get(), 4, sizeof(unsigned int), &cols);
+        cl_error(err, "Failed to set kernel arg 4\n");
+        err = clSetKernelArg(f.get(), 5, sizeof(unsigned int), &kernel_rows);
+        cl_error(err, "Failed to set kernel arg 5\n");
+        err = clSetKernelArg(f.get(), 6, sizeof(unsigned int), &kernel_cols);
+        cl_error(err, "Failed to set kernel arg 6\n");
+
+        err = clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, sizeof(float) * count, matrix.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to write buffer\n");
+        err = clEnqueueWriteBuffer(queue, kernel_buffer, CL_TRUE, 0, sizeof(float), kernel.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to write buffer\n");
+
+        size_t global_work_size[2] = {rows, cols};
+        err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
+        cl_error(err, "Failed to enqueue kernel\n");
+
+        err = clEnqueueReadBuffer(queue, output, CL_TRUE, 0, sizeof(float) * count, out.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to read buffer\n");
+
+        // Wait for the command queue to finish
+        clFinish(queue);
+        clReleaseMemObject(input);
+        clReleaseMemObject(output);
+        clReleaseMemObject(kernel_buffer);
+
+        return out;
+    }
+
+
+
     std::vector<float> runMatrixFunction(Cl_function &f, std::vector<float> &in, 
             size_t rows, size_t cols,
             size_t thX, size_t thY)
