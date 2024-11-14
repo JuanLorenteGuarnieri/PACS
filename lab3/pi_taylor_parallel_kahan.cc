@@ -44,17 +44,6 @@ void pi_taylor_chunk(size_t thread_id,
     std::cout << "Thread " << thread_id << " executed in: " << elapsed.count() << " seconds\n";
 }
 
-
-// void pi_taylor_chunk2(size_t thread_id, size_t start_step, size_t stop_step, my_float& result) {
-//     my_float partial_sum = 0.0;
-//     my_float sign = (start_step % 2 == 0) ? 1.0 : -1.0; // Alternate sign based on step
-//     for (size_t i = start_step; i < stop_step; ++i) {
-//         partial_sum += sign / (2.0 * i + 1.0);
-//         sign = -sign; // Alternate the sign for each term
-//     }
-//     result = partial_sum; // Store the result in the thread's output slot
-// }
-
 std::pair<size_t, size_t> usage(int argc, const char* argv[]) {
     // Read the number of steps and threads from the command line
     if (argc != 3) {

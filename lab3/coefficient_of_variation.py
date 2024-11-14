@@ -4,9 +4,6 @@ import numpy as np
 execution_times = [
     349.474279000,
     349.454280469,
-    174.508893260,
-    174.486753277,
-    174.466720359
 ]
 
 # execution_times = [
