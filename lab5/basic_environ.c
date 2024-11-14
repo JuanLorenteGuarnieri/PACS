@@ -21,170 +21,57 @@
 #else
   #include <CL/cl.h>
 #endif
-  
-// check error, in such a case, it exits
 
-void cl_error(cl_int code, const char *string){
-	if (code != CL_SUCCESS){
-		printf("%d - %s\n", code, string);
-	    exit(-1);
-	}
-}
+#include "cl_lib.cpp"
+  
+
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv)
 {
-  int err;                            	// error code returned from api calls
-  size_t t_buf = 50;			// size of str_buffer
-  char str_buffer[t_buf];		// auxiliary buffer	
-  size_t e_buf;				// effective size of str_buffer in use
-	    
-  size_t global_size;                      	// global domain size for our calculation
-  size_t local_size;                       	// local domain size for our calculation
+  cl_int err;
+  
 
-  const cl_uint num_platforms_ids = 10;				// max of allocatable platforms
-  cl_platform_id platforms_ids[num_platforms_ids];		// array of platforms
-  cl_uint n_platforms;						// effective number of platforms in use
-  const cl_uint num_devices_ids = 10;				// max of allocatable devices
-  cl_device_id devices_ids[num_platforms_ids][num_devices_ids];	// array of devices
-  cl_uint n_devices[num_platforms_ids];				// effective number of devices in use for each platform
-	
-  cl_device_id device_id;             				// compute device id 
-  cl_context context;                 				// compute context
-  cl_command_queue command_queue;     				// compute command queue
-    
+  Cl_runtime runtime;
 
-  // 1. Scan the available platforms:
-  err = clGetPlatformIDs (num_platforms_ids, platforms_ids, &n_platforms);
-  cl_error(err, "Error: Failed to Scan for Platforms IDs");
-  printf("Number of available platforms: %d\n\n", n_platforms);
-
-  for (int i = 0; i < n_platforms; i++ ){
-    err= clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_NAME, sizeof(str_buffer), str_buffer, NULL);
-    cl_error (err, "Error: Failed to get info of the platform\n");
-    printf( "\t[%d]-Platform Name: %s\n", i, str_buffer);
-
-    // Task: Print more information about the platform
-    clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_VENDOR, sizeof(str_buffer), str_buffer, NULL);
-    printf("\t\tPlatform Vendor: %s\n", str_buffer);
-    
-    clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_VERSION, sizeof(str_buffer), str_buffer, NULL);
-    printf("\t\tPlatform Version: %s\n", str_buffer);
-
-    clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_PROFILE, sizeof(str_buffer), str_buffer, NULL);
-    printf("\t\tPlatform Profile: %s\n", str_buffer);
-
-    clGetPlatformInfo(platforms_ids[i], CL_PLATFORM_HOST_TIMER_RESOLUTION, sizeof(e_buf), &e_buf, NULL);
-    printf("\t\tHost Timer Resolution: %zu\n", e_buf);
-  }
-  printf("\n");
-  // ***Task***: print on the screen the name, host_timer_resolution, vendor, versionm, ...
-	
-  // 2. Scan for devices in each platform
-  for (int i = 0; i < n_platforms; i++ ){
-    err = clGetDeviceIDs(platforms_ids[i], CL_DEVICE_TYPE_ALL, num_devices_ids, devices_ids[i], &(n_devices[i]));
-    cl_error(err, "Error: Failed to Scan for Devices IDs");
-    printf("\t[%d]-Platform. Number of available devices: %d\n", i, n_devices[i]);
-
-    for(int j = 0; j < n_devices[i]; j++){
-      err = clGetDeviceInfo(devices_ids[i][j], CL_DEVICE_NAME, sizeof(str_buffer), str_buffer, NULL);
-      cl_error(err, "clGetDeviceInfo: Getting device name");
-      printf("\t\t [%d]-Platform [%d]-Device CL_DEVICE_NAME: %s\n", i, j,str_buffer);
-
-      cl_uint max_compute_units_available;
-      err = clGetDeviceInfo(devices_ids[i][j], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(max_compute_units_available), &max_compute_units_available, NULL);
-      cl_error(err, "clGetDeviceInfo: Getting device max compute units available");
-      printf("\t\t [%d]-Platform [%d]-Device CL_DEVICE_MAX_COMPUTE_UNITS: %d\n\n", i, j, max_compute_units_available);
-
-      // Print additional device information
-      size_t global_mem_size;
-      err = clGetDeviceInfo(devices_ids[i][j], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(global_mem_size), &global_mem_size, NULL);
-      cl_error(err, "clGetDeviceInfo: Getting device global memory size");
-      printf("\t\t [%d]-Platform [%d]-Device CL_DEVICE_GLOBAL_MEM_SIZE: %zu bytes\n", i, j, global_mem_size);
-
-      cl_ulong local_mem_size;
-      err = clGetDeviceInfo(devices_ids[i][j], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(local_mem_size), &local_mem_size, NULL);
-      cl_error(err, "clGetDeviceInfo: Getting device local memory size");
-      printf("\t\t [%d]-Platform [%d]-Device CL_DEVICE_LOCAL_MEM_SIZE: %lu bytes\n", i, j, local_mem_size);
-
-      cl_ulong max_mem_alloc_size;
-      err = clGetDeviceInfo(devices_ids[i][j], CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(max_mem_alloc_size), &max_mem_alloc_size, NULL);
-      cl_error(err, "clGetDeviceInfo: Getting device max memory allocation size");
-      printf("\t\t [%d]-Platform [%d]-Device CL_DEVICE_MAX_MEM_ALLOC_SIZE: %lu bytes\n", i, j, max_mem_alloc_size);
-
-      size_t max_work_group_size;
-      err = clGetDeviceInfo(devices_ids[i][j], CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(max_work_group_size), &max_work_group_size, NULL);
-      cl_error(err, "clGetDeviceInfo: Getting device max work group size");
-      printf("\t\t [%d]-Platform [%d]-Device CL_DEVICE_MAX_WORK_GROUP_SIZE: %zu\n\n", i, j, max_work_group_size);
-    }
-  }	
-  // ***Task***: print on the screen the cache size, global mem size, local memsize, max work group size, profiling timer resolution and ... of each device
-
-
-  // 3. Create a context, with a device
-  cl_context_properties properties[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platforms_ids[0], 0}; // Using the first platform
-  context = clCreateContext(properties, n_devices[0], devices_ids[0], NULL, NULL, &err);
-  cl_error(err, "Failed to create a compute context\n");
-
-  // 4. Create a command queue
-  cl_command_queue_properties proprt[] = { CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0 };
-  command_queue = clCreateCommandQueueWithProperties(context, devices_ids[0][0], proprt, &err); // Using the first device
-  cl_error(err, "Failed to create a command queue\n");
-
-
-  std::string KernelSource = "__kernel void pow_of_two("
+  std::string s_pow_of_two = "__kernel void pow2("
         "__global float *in,"
         "__global float *out,"
         "const unsigned int count){"
 
-        "int i = get_global_id(/***???***/);"
-
-        "printf(\"%d\\n\", i);"
+        "int i = get_global_id(0);"
 
         "if(i < count){"
         "  out[i] = in[i] * in[i];"
         "}"
       "}";
 
-  auto fileSize = KernelSource.size();
+  std::string s_printMatrix = "__kernel void printMatrix("
+        "__global float *in,"
+        "__global float *out,"
+        "const unsigned int rows,"
+        "const unsigned int cols){"
 
-  auto Program = clCreateProgramWithSource(context, 1, (const char **) &KernelSource, &fileSize, &err);
-  cl_error(err, "Failed to create a program with source\n");
+        "int i = get_global_id(0);"
+        "int j = get_global_id(1);"
 
-  clBuildProgram(Program, 0, NULL, NULL, NULL, NULL);
+        "if(i < rows && j < cols){"
+        "  printf(\"%i, %i\", i, j);"
+        "}"
+      "}";
 
-  auto Kernel = clCreateKernel(Program, "pow_of_two", &err);
 
-  const size_t count = 10;
-  float in[count];
-  float out[count];
+  Cl_function f_pow_of_two = runtime.createFunction("pow2", s_pow_of_two);
+  Cl_function f_printMatrix = runtime.createFunction("printMatrix", s_printMatrix);
 
-  for (int i = 0; i < count; i++){
+  const size_t count = 3;
+  std::vector<float> in(count*count);
+
+  for (int i = 0; i < count*count; i++){
     in[i] = i;
   }
 
-  cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
-  cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * count, NULL, &err);
-
-  clSetKernelArg(Kernel, 0, sizeof(cl_mem), &input);
-  clSetKernelArg(Kernel, 1, sizeof(cl_mem), &output);
-  clSetKernelArg(Kernel, 2, sizeof(unsigned int), &count);
-
-  clEnqueueWriteBuffer(command_queue, input, CL_TRUE, 0, sizeof(float) * count, in, 0, NULL, NULL);
-  clEnqueueNDRangeKernel(command_queue, Kernel, 1, NULL, &count, NULL, 0, NULL, NULL);
-  clEnqueueReadBuffer(command_queue, output, CL_TRUE, 0, sizeof(float) * 10, out, 0, NULL, NULL);
-
-  // Wait for the command queue to finish
-  clFinish(command_queue);
-
-
-  for(int i = 0; i < 10; i++){
-    printf("%f\n", out[i]);
-  }
-
-  // Clean up resources (optional, but good practice)
-  clReleaseCommandQueue(command_queue);
-  clReleaseContext(context);
+  auto out = runtime.runMatrixFunction(f_printMatrix, in, count, count);
 
   return 0;
 }
