@@ -41,8 +41,23 @@ public:
         cl_program Program = clCreateProgramWithSource(context, 1, (const char **) &source_code, &fileSize, &err);
         cl_error(err, "Failed to create a program"+name+"with source\n");
 
+        size_t log_size;
+        // Get the size of the log
+        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+
+        // Allocate memory for the log
+        std::vector<char> log(log_size);
+
+        // Retrieve the log
+        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr);
+
+        // Print the log
+        std::cerr << "Build log:\n" << log.data() << std::endl;
+
         err = clBuildProgram(Program, 0, NULL, NULL, NULL, NULL);
-        cl_error (err, "Failed to build program "+name+"\n");
+        cl_error(err, "Failed to build program\n");
+
+
         kernel = clCreateKernel(Program, name.c_str(), &err);
     }
 
@@ -207,30 +222,37 @@ public:
 
     std::string s_convolution() const
     {
-        std::string convolution_code = "__kernel void convolution("
+        std::string convolution_code = 
+        "__kernel void convolution("
             "__global float *matrix,"
             "__global float *kernel,"
             "__global float *out,"
             "const unsigned int rows,"
             "const unsigned int cols,"
             "const unsigned int kernel_rows,"
-            "const unsigned int kernel_cols){"
+            "const unsigned int kernel_cols)"
+        "{"
 
             "int i = get_global_id(0);"
             "int j = get_global_id(1);"
 
-            "if(i < rows && j < cols){"
-            "  float sum = 0;"
-            "  for (int k = 0; k < kernel_rows; k++){"
-            "    for (int l = 0; l < kernel_cols; l++){"
-            "      if (i+k < 0 || i+k >= rows || j+l < 0 || j+l >= cols){"
-            "       sum += matrix[(i+k)*cols + j+l] * kernel[k*kernel_cols + l];"
-            "      }"    
-            "    }"
-            "  }"
-            "  out[i*cols + j] = sum;"
+            "if(i < rows && j < cols)"
+            "{"
+            "      float sum = 0;"
+            "      for (int k = 0; k < kernel_rows; k++)"
+            "      {"
+            "          for (int l = 0; l < kernel_cols; l++)"
+            "          {"
+            "               if (i+k >= 0 && i+k < rows && j+l >= 0 && j+l < cols) {"
+            "                    sum += matrix[(i+k)*cols + j+l] * kernel[k*kernel_cols + l];"
+            "                }"
+                            
+            "          }"
+            "       }"
+               
+            "       out[i*cols + j] = sum;"
             "}"
-            "}";    
+        "}";    
 
         return convolution_code;
     }
