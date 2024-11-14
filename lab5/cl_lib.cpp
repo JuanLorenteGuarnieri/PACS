@@ -229,6 +229,8 @@ public:
             "  out[i*cols + j] = sum;"
             "}"
             "}";    
+
+        return convolution_code;
     }
 
 
