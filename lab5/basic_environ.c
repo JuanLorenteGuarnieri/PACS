@@ -56,9 +56,8 @@ int main(int argc, char** argv)
         "int j = get_global_id(1);"
 
         // Flip on X axis
-        "if(i < rows/2 && j < cols/2){"
+        "if(i < rows && j < cols){"
         "  out[i*cols + cols-1-j] = in[i*cols + j];"
-        "  out[i*cols + j] = in[i*cols + cols-1-j];"
         "}"
       "}";
 
@@ -66,7 +65,7 @@ int main(int argc, char** argv)
   Cl_function f_pow_of_two = runtime.createFunction("pow2", s_pow_of_two);
   Cl_function f_flipMatrix = runtime.createFunction("flipMatrix", s_flipMatrix);
 
-  const size_t count = 2;
+  const size_t count = 3;
   std::vector<float> in(count*count);
 
   for (int i = 0; i < count*count; i++){
@@ -75,7 +74,7 @@ int main(int argc, char** argv)
 
   auto out = runtime.runMatrixFunction(f_flipMatrix, in, 
       count, count, 
-      count/2, count/2);
+      count, count);
 
 
   for (int i = 0; i < count*count; i++){
