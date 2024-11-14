@@ -205,7 +205,9 @@ public:
     }
 
 
-    std::vector<float> runMatrixFunction(Cl_function &f, std::vector<float> &in, size_t rows, size_t cols)
+    std::vector<float> runMatrixFunction(Cl_function &f, std::vector<float> &in, 
+            size_t rows, size_t cols,
+            size_t thX, size_t thY)
     {
         cl_int err;
         size_t count = rows*cols;
@@ -229,7 +231,7 @@ public:
         cl_error(err, "Failed to write buffer\n");
         
         // Launch 2d kernel
-        size_t global_work_size[2] = {rows, cols};
+        size_t global_work_size[2] = {thX, thY};
         err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
         cl_error(err, "Failed to enqueue kernel\n");
 

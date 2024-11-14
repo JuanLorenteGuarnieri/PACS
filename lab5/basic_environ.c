@@ -46,7 +46,7 @@ int main(int argc, char** argv)
         "}"
       "}";
 
-  std::string s_printMatrix = "__kernel void printMatrix("
+  std::string s_flipMatrix = "__kernel void flipMatrix("
         "__global float *in,"
         "__global float *out,"
         "const unsigned int rows,"
@@ -55,23 +55,46 @@ int main(int argc, char** argv)
         "int i = get_global_id(0);"
         "int j = get_global_id(1);"
 
-        "if(i < rows && j < cols){"
-        "  printf(\"%i, %i\", i, j);"
+        // Flip on X axis
+        "if(i < rows/2 && j < cols/2){"
+        "  out[i*cols + cols-1-j] = in[i*cols + j];"
+        "  out[i*cols + j] = in[i*cols + cols-1-j];"
         "}"
       "}";
 
 
   Cl_function f_pow_of_two = runtime.createFunction("pow2", s_pow_of_two);
-  Cl_function f_printMatrix = runtime.createFunction("printMatrix", s_printMatrix);
+  Cl_function f_flipMatrix = runtime.createFunction("flipMatrix", s_flipMatrix);
 
-  const size_t count = 3;
+  const size_t count = 2;
   std::vector<float> in(count*count);
 
   for (int i = 0; i < count*count; i++){
-    in[i] = i;
+    in[i] = i+1;
   }
 
-  auto out = runtime.runMatrixFunction(f_printMatrix, in, count, count);
+  auto out = runtime.runMatrixFunction(f_flipMatrix, in, 
+      count, count, 
+      count/2, count/2);
+
+
+  for (int i = 0; i < count*count; i++){
+    printf("%f ", in[i]);
+  
+    if (i % count == count-1){
+      printf("\n");
+    }
+  }
+  printf("\n");
+
+  for (int i = 0; i < count*count; i++){
+    printf("%f ", out[i]);
+  
+    if (i % count == count-1){
+      printf("\n");
+    }
+  }
+
 
   return 0;
 }
