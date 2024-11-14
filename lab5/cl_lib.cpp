@@ -33,7 +33,7 @@ class Cl_function
 
 public:
 
-    Cl_function (cl_context context, std::string name, std::string source_code)
+    Cl_function (cl_context context, cl_device_id device_id, std::string name, std::string source_code)
     {
         cl_int err;
         auto fileSize = source_code.size();
@@ -43,18 +43,18 @@ public:
 
         size_t log_size;
         // Get the size of the log
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+        clGetProgramBuildInfo(Program, device_id, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
 
         // Allocate memory for the log
         std::vector<char> log(log_size);
 
         // Retrieve the log
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr);
+        clGetProgramBuildInfo(Program, device_id, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr);
 
         // Print the log
         std::cerr << "Build log:\n" << log.data() << std::endl;
 
-        err = clBuildProgram(Program, 0, NULL, NULL, NULL, NULL);
+        err = clBuildProgram(Program, device_id, NULL, NULL, NULL, NULL);
         cl_error(err, "Failed to build program\n");
 
 
@@ -72,6 +72,7 @@ class Cl_runtime
 {
     cl_context context;
     cl_command_queue queue;
+    cl_device_id device_id;
 
 public:
 
@@ -98,8 +99,6 @@ public:
         cl_device_id devices_ids[num_platforms_ids][num_devices_ids];	// array of devices
         cl_uint n_devices[num_platforms_ids];				// effective number of devices in use for each platform
             
-        cl_device_id device_id;             				// compute device id 
-
         // 1. Scan the available platforms:
         err = clGetPlatformIDs (num_platforms_ids, platforms_ids, &n_platforms);
         cl_error(err, "Error: Failed to Scan for Platforms IDs");
@@ -183,7 +182,7 @@ public:
 
     Cl_function createFunction(std::string name, std::string sourceCode) const
     {
-        return Cl_function(context, name, sourceCode);
+        return Cl_function(context, device_id, name, sourceCode);
     }
 
     std::vector<float> runBufferFunction(Cl_function &f, std::vector<float> &in)
