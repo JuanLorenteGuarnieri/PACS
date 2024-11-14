@@ -72,10 +72,20 @@ int main(int argc, char** argv)
     in[i] = i+1;
   }
 
-  auto out = runtime.runMatrixFunction(f_flipMatrix, in, 
-      count, count, 
-      count, count);
+  std::vector<std::vector<float>> matrix = {
+    {1.0f, 2.0f, 3.0f},
+    {4.0f, 9.0f, 5.0f},
+    {6.0f, 8.0f, 0.0f}
+  };
 
+  std::vector<std::vector<float>> kernel = {
+    {0.0625f, 0.125f, 0.0625f},
+    {0.125f, 0.25f, 0.125f},
+    {0.0625f, 0.125f, 0.0625f}
+  };
+
+  auto out = runtime.convolution(matrix, kernel);
+  
 
   for (int i = 0; i < count*count; i++){
     printf("%f ", in[i]);
