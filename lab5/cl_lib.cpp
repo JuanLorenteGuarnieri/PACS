@@ -221,6 +221,17 @@ public:
 
     std::string s_convolution() const
     {
+        std::string s_pow_of_two = "__kernel void pow2("
+                "__global float *in,"
+                "__global float *out,"
+                "const unsigned int count){"
+
+                "int i = get_global_id(0);"
+
+                "if(i < count){"
+                "  out[i] = in[i] * in[i];"
+                "}"
+            "}";
         std::string convolution_code = 
         "__kernel void convolution("
             "__global float *matrix,"
@@ -253,7 +264,7 @@ public:
             "}"
         "}";    
 
-        return convolution_code;
+        return s_pow_of_two;
     }
 
 
