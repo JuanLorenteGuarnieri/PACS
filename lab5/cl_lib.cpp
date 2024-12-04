@@ -1,5 +1,6 @@
 
 #include <fcntl.h>
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,8 +38,10 @@ public:
     {
         cl_int err;
         auto fileSize = source_code.size();
+        auto source_code_char = source_code.c_str();
 
-        cl_program Program = clCreateProgramWithSource(context, 1, (const char **) &source_code, &fileSize, &err);
+        // cl_program Program = clCreateProgramWithSource(context, 1, (const char **) &source_code, &fileSize, &err);
+        cl_program Program = clCreateProgramWithSource(context, 1, (const char **) &source_code_char, &fileSize, &err);
         cl_error(err, "Failed to create a program"+name+"with source\n");
 
         size_t log_size;
@@ -52,13 +55,15 @@ public:
         clGetProgramBuildInfo(Program, device_id, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr);
 
         // Print the log
-        std::cerr << "Build log:\n" << log.data() << std::endl;
+        // std::cerr << "Build log:\n" << log.data() << std::endl;
 
-        err = clBuildProgram(Program, device_id, NULL, NULL, NULL, NULL);
+        const cl_device_id devices[] = { device_id };
+        err = clBuildProgram(Program, 1, devices, "", NULL, NULL);
         cl_error(err, "Failed to build program\n");
 
 
         kernel = clCreateKernel(Program, name.c_str(), &err);
+        // cl_error(err, "Failed?");
     }
 
     cl_kernel get()
@@ -178,6 +183,7 @@ public:
         cl_command_queue_properties proprt[] = { CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0 };
         queue = clCreateCommandQueueWithProperties(context, devices_ids[0][0], proprt, &err); // Using the first device
         cl_error(err, "Failed to create a command queue\n");
+        device_id = devices_ids[0][0];
     }
 
     Cl_function createFunction(std::string name, std::string sourceCode) const
@@ -221,21 +227,10 @@ public:
 
     std::string s_convolution() const
     {
-        std::string s_pow_of_two = "__kernel void pow2("
-                "__global float *in,"
-                "__global float *out,"
-                "const unsigned int count){"
-
-                "int i = get_global_id(0);"
-
-                "if(i < count){"
-                "  out[i] = in[i] * in[i];"
-                "}"
-            "}";
         std::string convolution_code = 
         "__kernel void convolution("
             "__global float *matrix,"
-            "__global float *kernel,"
+            "__global float *ka,"
             "__global float *out,"
             "const unsigned int rows,"
             "const unsigned int cols,"
@@ -254,7 +249,7 @@ public:
             "          for (int l = 0; l < kernel_cols; l++)"
             "          {"
             "               if (i+k >= 0 && i+k < rows && j+l >= 0 && j+l < cols) {"
-            "                    sum += matrix[(i+k)*cols + j+l] * kernel[k*kernel_cols + l];"
+            "                    sum += matrix[(i+k)*cols + j+l] * ka[k*kernel_cols + l];"
             "                }"
                             
             "          }"
@@ -264,7 +259,7 @@ public:
             "}"
         "}";    
 
-        return s_pow_of_two;
+        return convolution_code;
     }
 
 
@@ -292,7 +287,7 @@ public:
         size_t count = matrix.size()*matrix[0].size();                 
         Cl_function f = createFunction("convolution", s_convolution());
 
-        auto flatten_result = runConvolutionFunction(f, flattenMatrix, flattenKernel, matrix.size(), matrix[0].size(), kernel.size(), kernel[0].size());
+        auto flatten_result = runConvolutionFunction(f, flattenMatrix, flattenKernel, matrix[0].size(), matrix[1].size(), kernel[0].size(), kernel[1].size());
     
         std::vector<std::vector<float>> result(matrix.size(), std::vector<float>(matrix[0].size()));
 
@@ -310,16 +305,18 @@ public:
             size_t kernel_rows, size_t kernel_cols)
     {
         cl_int err;
-        size_t count = rows*cols;
+        size_t count = rows * cols;
+        size_t kernel_count = kernel_rows * kernel_cols;
         std::vector<float> out(count);
 
         cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
         cl_error(err, "Failed to create buffer\n");
+        cl_mem kernel_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * kernel_count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
         cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * count, NULL, &err);
         cl_error(err, "Failed to create buffer\n");
-        cl_mem kernel_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * kernel.size(), NULL, &err);
-        cl_error(err, "Failed to create buffer\n");
 
+        // Set kernel arguments
         err = clSetKernelArg(f.get(), 0, sizeof(cl_mem), &input);
         cl_error(err, "Failed to set kernel arg 0\n");
         err = clSetKernelArg(f.get(), 1, sizeof(cl_mem), &kernel_buffer);
@@ -335,26 +332,33 @@ public:
         err = clSetKernelArg(f.get(), 6, sizeof(unsigned int), &kernel_cols);
         cl_error(err, "Failed to set kernel arg 6\n");
 
+        // Write input and kernel buffer to device memory
         err = clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, sizeof(float) * count, matrix.data(), 0, NULL, NULL);
         cl_error(err, "Failed to write buffer\n");
-        err = clEnqueueWriteBuffer(queue, kernel_buffer, CL_TRUE, 0, sizeof(float), kernel.data(), 0, NULL, NULL);
+
+        err = clEnqueueWriteBuffer(queue, kernel_buffer, CL_TRUE, 0, sizeof(float) * kernel_count, kernel.data(), 0, NULL, NULL);
         cl_error(err, "Failed to write buffer\n");
 
+        // Enqueue kernel execution
         size_t global_work_size[2] = {rows, cols};
         err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
         cl_error(err, "Failed to enqueue kernel\n");
 
+        // Read result buffer
         err = clEnqueueReadBuffer(queue, output, CL_TRUE, 0, sizeof(float) * count, out.data(), 0, NULL, NULL);
         cl_error(err, "Failed to read buffer\n");
 
         // Wait for the command queue to finish
         clFinish(queue);
+
+        // Clean up memory
         clReleaseMemObject(input);
         clReleaseMemObject(output);
         clReleaseMemObject(kernel_buffer);
 
         return out;
     }
+
 
 
 

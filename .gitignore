@@ -5,6 +5,9 @@
 *.a
 *.so
 
+output/
+logs/
+
 # Ignore build directories
 build/
 build-debug/

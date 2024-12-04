@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////
-//File: basic_environ.c
+//File: sobel.c
 //
-//Description: base file for environment exercises with openCL
+//Description: sobel program
 //
 // 
 ////////////////////////////////////////////////////////////////////
@@ -75,15 +75,16 @@ std::string getCurrentDateTime() {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 5) {
-        fprintf(stderr, "Usage: %s <input_image_path> <output_image_path> <kernel_path> <log_path>\n", argv[0]);
+    if (argc < 6) {
+        fprintf(stderr, "Usage: %s <input_image_path> <output_image_path> <kernel_gx_path> <kernel_gy_path> <log_path>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     const char* input_path = argv[1];
     const char* output_path = argv[2];
-    const char* kernel_path = argv[3];
-    const char* log_path = argv[4];
+    const char* kernel_gx_path = argv[3];
+    const char* kernel_gy_path = argv[4];
+    const char* log_path = argv[5];
 
     cl_int err;
     Cl_runtime runtime;
@@ -106,69 +107,20 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Load kernel
-    std::vector<std::vector<float>> kernel = loadKernel(kernel_path);
+    // Load Sobel kernels for gx and gy
+    std::vector<std::vector<float>> kernel_gx = loadKernel(kernel_gx_path);
+    std::vector<std::vector<float>> kernel_gy = loadKernel(kernel_gy_path);
 
     // Measure the execution time of the overall program
     auto program_start = std::chrono::high_resolution_clock::now();
 
-    // Measure the execution time of the kernel
-    auto kernel_start = std::chrono::high_resolution_clock::now();
-    auto out = runtime.convolution(matrix, kernel);
-    auto kernel_end = std::chrono::high_resolution_clock::now();
+    // Perform convolution for gx (horizontal edges)
+    auto gx = runtime.convolution(matrix, kernel_gx);
 
-    // Save the output as an image
-    CImg<float> output_image(cols, rows, 1, 1);
-    for (int y = 0; y < rows; ++y) {
-        for (int x = 0; x < cols; ++x) {
-            output_image(x, y) = out[y][x];
-        }
-    }
-    output_image.save(output_path);
+    // Perform convolution for gy (vertical edges)
+    auto gy = runtime.convolution(matrix, kernel_gy);
 
-    auto program_end = std::chrono::high_resolution_clock::now();
-
-    // Calculate metrics
-    double program_execution_time = std::chrono::duration<double>(program_end - program_start).count();
-    double kernel_execution_time = std::chrono::duration<double>(kernel_end - kernel_start).count();
-    size_t memory_transfer = rows * cols * sizeof(float) + kernel.size() * kernel[0].size() * sizeof(float);
-    double memory_bandwidth = memory_transfer / kernel_execution_time;
-    double throughput = rows * cols / kernel_execution_time; // Pixels per second
-
-    // Memory footprint
-    size_t memory_footprint = matrix.size() * matrix[0].size() * sizeof(float) +
-                              kernel.size() * kernel[0].size() * sizeof(float);
-
-    // Create log file
-    std::string log_filename = std::string(log_path) + "/convolution_" + getCurrentDateTime() + ".log";
-    std::ofstream log_file(log_filename);
-
-    if (!log_file.is_open()) {
-        std::cerr << "Error: Unable to create log file at " << log_filename << "\n";
-        return EXIT_FAILURE;
-    }
-
-    // Write metrics to the log file
-    std::string params = "Input Image: " + std::string(input_path) +
-                         ", Output Image: " + std::string(output_path) +
-                         ", Kernel File: " + std::string(kernel_path);
-    log_file << "Program Parameters: " << params << "\n";
-    log_file << "Convolution Metrics:\n";
-    log_file << "Execution time (overall program): " << program_execution_time << " seconds\n";
-    log_file << "Execution time (kernel): " << kernel_execution_time << " seconds\n";
-    log_file << "Memory bandwidth: " << memory_bandwidth / (1024 * 1024) << " MB/s\n";
-    log_file << "Kernel throughput: " << throughput / (1024 * 1024) << " MPixels/s\n";
-    log_file << "Memory footprint: " << memory_footprint / (1024 * 1024) << " MB\n";
-
-    log_file.close();
-
-    std::cout << "Log saved to: " << log_filename << "\n";
-
-    return 0;
-}
-
-/*
-  std::string s_pow_of_two = "__kernel void pow2("
+    std::string s_pow_of_two = "__kernel void pow2("
         "__global float *in,"
         "__global float *out,"
         "const unsigned int count){"
@@ -180,30 +132,61 @@ int main(int argc, char** argv) {
         "}"
       "}";
 
-  std::string s_flipMatrix = "__kernel void flipMatrix("
-        "__global float *in,"
-        "__global float *out,"
-        "const unsigned int rows,"
-        "const unsigned int cols){"
-
-        "int i = get_global_id(0);"
-        "int j = get_global_id(1);"
-
-        // Flip on X axis
-        "if(i < rows && j < cols){"
-        "  out[i*cols + cols-1-j] = in[i*cols + j];"
-        "}"
-      "}";
+    // Cl_function f_pow_of_two = runtime.createFunction("pow2", s_pow_of_two);
+    // auto gx2 = runtime.runMatrixFunction(f_pow_of_two, gx, rows, cols, 5, 5);
+    // auto gy2 = runtime.runMatrixFunction(f_pow_of_two, gy, rows, cols, 5, 5);
 
 
-  Cl_function f_pow_of_two = runtime.createFunction("pow2", s_pow_of_two);
-  Cl_function f_flipMatrix = runtime.createFunction("flipMatrix", s_flipMatrix);
+    std::vector<std::vector<float>> gradient_magnitude(rows, std::vector<float>(cols));
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            gradient_magnitude[y][x] = sqrt(gx[y][x] * gx[y][x] + gy[y][x] * gy[y][x]);
+        }
+    }
+    // auto gradient_magnitude = sqrt(gx2+gy2);
 
+    // Save the gradient magnitude image
+    CImg<float> output_image(cols, rows, 1, 1);
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            output_image(x, y) = gradient_magnitude[y][x];
+        }
+    }
+    output_image.save(output_path);
 
-  const size_t count = 3;
-  std::vector<float> in(count*count);
+    auto program_end = std::chrono::high_resolution_clock::now();
 
-  for (int i = 0; i < count*count; i++){
-    in[i] = i+1;
-  }
-  */
+    // Calculate metrics
+    double program_execution_time = std::chrono::duration<double>(program_end - program_start).count();
+    size_t memory_transfer = rows * cols * sizeof(float) + kernel_gx.size() * kernel_gx[0].size() * sizeof(float) +
+                             kernel_gy.size() * kernel_gy[0].size() * sizeof(float);
+    double memory_bandwidth = memory_transfer / program_execution_time;
+    double throughput = rows * cols / program_execution_time; // Pixels per second
+
+    // Memory footprint
+    size_t memory_footprint = matrix.size() * matrix[0].size() * sizeof(float) +
+                              kernel_gx.size() * kernel_gx[0].size() * sizeof(float) +
+                              kernel_gy.size() * kernel_gy[0].size() * sizeof(float);
+
+    // Create log file
+    std::string log_filename = std::string(log_path) + "/sobel_" + getCurrentDateTime() + ".log";
+    std::ofstream log_file(log_filename);
+
+    if (!log_file.is_open()) {
+        std::cerr << "Error: Unable to create log file at " << log_filename << "\n";
+        return EXIT_FAILURE;
+    }
+
+    // Write metrics to the log file
+    log_file << "Program Parameters: \n";
+    log_file << "Execution time (overall program): " << program_execution_time << " seconds\n";
+    log_file << "Memory bandwidth: " << memory_bandwidth / (1024 * 1024) << " MB/s\n";
+    log_file << "Kernel throughput: " << throughput / (1024 * 1024) << " MPixels/s\n";
+    log_file << "Memory footprint: " << memory_footprint / (1024 * 1024) << " MB\n";
+
+    log_file.close();
+
+    std::cout << "Log saved to: " << log_filename << "\n";
+
+    return 0;
+}
