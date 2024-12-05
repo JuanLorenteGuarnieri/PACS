@@ -119,30 +119,33 @@ int main(int argc, char** argv) {
 
     // Perform convolution for gy (vertical edges)
     auto gy = runtime.convolution(matrix, kernel_gy);
+    
+    std::vector<float> flattenGx(gx.size()*gx[0].size());
+    std::vector<float> flattenGy(gy.size()*gy[0].size());
 
-    std::string s_pow_of_two = "__kernel void pow2("
-        "__global float *in,"
-        "__global float *out,"
-        "const unsigned int count){"
-
-        "int i = get_global_id(0);"
-
-        "if(i < count){"
-        "  out[i] = in[i] * in[i];"
-        "}"
-      "}";
-
-    // Cl_function f_pow_of_two = runtime.createFunction("pow2", s_pow_of_two);
-    // auto gx2 = runtime.runMatrixFunction(f_pow_of_two, gx, rows, cols, 5, 5);
-    // auto gy2 = runtime.runMatrixFunction(f_pow_of_two, gy, rows, cols, 5, 5);
-
-
-    std::vector<std::vector<float>> gradient_magnitude(rows, std::vector<float>(cols));
-    for (int y = 0; y < rows; ++y) {
-        for (int x = 0; x < cols; ++x) {
-            gradient_magnitude[y][x] = sqrt(gx[y][x] * gx[y][x] + gy[y][x] * gy[y][x]);
+    for (size_t i = 0; i < gx.size(); i++){
+        for (size_t j = 0; j < gx[0].size(); j++){
+            flattenGx[i*gx[0].size() + j] = gx[i][j];
         }
     }
+    for (size_t i = 0; i < gy.size(); i++){
+        for (size_t j = 0; j < gy[0].size(); j++){
+            flattenGy[i*gy[0].size() + j] = gy[i][j];
+        }
+    }
+
+    auto gx2 = runtime.pow2(gx);
+    auto gy2 = runtime.pow2(gx);
+
+    auto gradient_magnitude = runtime.sumSqrt(gx, gy);
+
+    // std::vector<std::vector<float>> gradient_magnitude(rows, std::vector<float>(cols));
+    // for (int y = 0; y < rows; ++y) {
+    //     for (int x = 0; x < cols; ++x) {
+    //         gradient_magnitude[y][x] = sqrt(gx2[y][x] + gy2[y][x]);
+    //     }
+    // }
+
     // auto gradient_magnitude = sqrt(gx2+gy2);
 
     // Save the gradient magnitude image

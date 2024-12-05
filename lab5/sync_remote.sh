@@ -35,7 +35,7 @@ fi
 echo "Uploading images and kernels to the remote machine..."
 sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_IMAGES" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
 sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_KERNELS" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
-sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_BASE"/*.c "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
+sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_BASE"/* "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
 
 # Download logs and results from the remote machine without overwriting
 echo "Downloading logs and results from the remote machine..."

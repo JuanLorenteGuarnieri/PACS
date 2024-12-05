@@ -300,9 +300,9 @@ public:
         return result;
     }
 
-    std::vector<float> runConvolutionFunction(Cl_function &f, std::vector<float> &matrix, 
-            std::vector<float> &kernel, size_t rows, size_t cols, 
-            size_t kernel_rows, size_t kernel_cols)
+    std::vector<float> runConvolutionFunction(Cl_function &f, std::vector<float> &matrix,
+            std::vector<float> &kernel,
+             size_t rows, size_t cols, size_t kernel_rows, size_t kernel_cols)
     {
         cl_int err;
         size_t count = rows * cols;
@@ -359,7 +359,182 @@ public:
         return out;
     }
 
+    std::vector<std::vector<float>> pow2(std::vector<std::vector<float>> &matrix)
+    {
+        std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
 
+        for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t j = 0; j < matrix[0].size(); j++){
+                flattenMatrix[i*matrix[0].size() + j] = matrix[i][j];
+            }
+        }
+
+        cl_int err;
+
+
+        std::string s = "__kernel void pow2("
+            "__global float *in,"
+            "__global float *out,"
+            "const unsigned int count){"
+
+            "int i = get_global_id(0);"
+
+            "if(i < count){"
+            "  out[i] = in[i] * in[i];"
+            "}"
+        "}";
+
+        Cl_function f = createFunction("pow2", s);
+
+        size_t count = matrix.size()*matrix[0].size();
+
+        auto flatten_result = runPow2(f, flattenMatrix, matrix.size(), matrix[0].size(), matrix[0].size()/2, matrix[1].size()/2);
+    
+        std::vector<std::vector<float>> result(matrix.size(), std::vector<float>(matrix[0].size()));
+
+        for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t j = 0; j < matrix[0].size(); j++){
+                result[i][j] = flatten_result[i*matrix[0].size() + j];
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<float> runPow2(Cl_function &f, std::vector<float> &in, 
+            size_t rows, size_t cols,
+            size_t thX, size_t thY)
+    {
+        cl_int err;
+        size_t count = rows*cols;
+        std::vector<float> out(count);
+
+        cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+        cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+
+        err = clSetKernelArg(f.get(), 0, sizeof(cl_mem), &input);
+        cl_error(err, "Failed to set kernel arg 0\n");
+        err = clSetKernelArg(f.get(), 1, sizeof(cl_mem), &output);
+        cl_error(err, "Failed to set kernel arg 1\n");
+        err = clSetKernelArg(f.get(), 2, sizeof(unsigned int), &count);
+        cl_error(err, "Failed to set kernel arg 2\n");
+
+        err = clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, sizeof(float) * count, in.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to write buffer\n");
+        
+        // Launch 2d kernel
+        size_t global_work_size[2] = {thX, thY};
+        err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
+        cl_error(err, "Failed to enqueue kernel\n");
+
+        err = clEnqueueReadBuffer(queue, output, CL_TRUE, 0, sizeof(float) * count, out.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to read buffer\n");
+
+        // Wait for the command queue to finish
+        clFinish(queue);
+        clReleaseMemObject(input);
+        clReleaseMemObject(output);
+
+        return out;
+    }
+
+std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix, std::vector<std::vector<float>> &matrix2)
+    {
+        std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
+        std::vector<float> flattenMatrix2(matrix2.size()*matrix2[0].size());
+
+        for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t j = 0; j < matrix[0].size(); j++){
+                flattenMatrix[i*matrix[0].size() + j] = matrix[i][j];
+            }
+        }
+
+        for (size_t i = 0; i < matrix2.size(); i++){
+            for (size_t j = 0; j < matrix2[0].size(); j++){
+                flattenMatrix2[i*matrix2[0].size() + j] = matrix2[i][j];
+            }
+        }
+
+        cl_int err;
+
+
+        std::string s = "__kernel void sumSqrt("
+            "__global float *in,"
+            "__global float *in2,"
+            "__global float *out,"
+            "const unsigned int count){"
+
+            "int i = get_global_id(0);"
+
+            "if(i < count){"
+            "  out[i] = sqrt(in[i] + in2[i]);"
+            "}"
+        "}";
+
+        Cl_function f = createFunction("sumSqrt", s);
+
+        size_t count = matrix.size()*matrix[0].size();
+
+        auto flatten_result = runSumSqrt(f, flattenMatrix, flattenMatrix2, matrix.size(), matrix[0].size(), matrix[0].size()/2, matrix[1].size()/2);
+    
+        std::vector<std::vector<float>> result(matrix.size(), std::vector<float>(matrix[0].size()));
+
+        for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t j = 0; j < matrix[0].size(); j++){
+                result[i][j] = flatten_result[i*matrix[0].size() + j];
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<float> runSumSqrt(Cl_function &f, std::vector<float> &in, std::vector<float> &in2, 
+            size_t rows, size_t cols,
+            size_t thX, size_t thY)
+    {
+        cl_int err;
+        size_t count = rows*cols;
+        std::vector<float> out(count);
+
+        cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+        cl_mem input2 = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+        cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * count, NULL, &err);
+        cl_error(err, "Failed to create buffer\n");
+
+        err = clSetKernelArg(f.get(), 0, sizeof(cl_mem), &input);
+        cl_error(err, "Failed to set kernel arg 0\n");
+        err = clSetKernelArg(f.get(), 1, sizeof(cl_mem), &input2);
+        cl_error(err, "Failed to set kernel arg 0\n");
+        err = clSetKernelArg(f.get(), 2, sizeof(cl_mem), &output);
+        cl_error(err, "Failed to set kernel arg 1\n");
+        err = clSetKernelArg(f.get(), 3, sizeof(unsigned int), &count);
+        cl_error(err, "Failed to set kernel arg 2\n");
+
+        err = clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, sizeof(float) * count, in.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to write buffer\n");
+
+        err = clEnqueueWriteBuffer(queue, input2, CL_TRUE, 0, sizeof(float) * count, in2.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to write buffer\n");
+        
+        // Launch 2d kernel
+        size_t global_work_size[2] = {thX, thY};
+        err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
+        cl_error(err, "Failed to enqueue kernel\n");
+
+        err = clEnqueueReadBuffer(queue, output, CL_TRUE, 0, sizeof(float) * count, out.data(), 0, NULL, NULL);
+        cl_error(err, "Failed to read buffer\n");
+
+        // Wait for the command queue to finish
+        clFinish(queue);
+        clReleaseMemObject(input);
+        clReleaseMemObject(output);
+
+        return out;
+    }
 
 
     std::vector<float> runMatrixFunction(Cl_function &f, std::vector<float> &in, 
