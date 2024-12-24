@@ -264,8 +264,8 @@ public:
 
 
     std::vector<std::vector<float>> convolution(
-            std::vector<std::vector<float>> &matrix, 
-            std::vector<std::vector<float>> &kernel)
+            const std::vector<std::vector<float>> &matrix, 
+            const std::vector<std::vector<float>> &kernel)
     {
         std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
         std::vector<float> flattenKernel(kernel.size()*kernel[0].size());

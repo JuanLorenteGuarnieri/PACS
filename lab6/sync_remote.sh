@@ -19,7 +19,7 @@ LOCAL_OUTPUT="./output"
 # Remote directories
 REMOTE_USER="$1"
 REMOTE_HOST="central.cps.unizar.es"
-REMOTE_BASE="/home/$REMOTE_USER/PACS/lab5"
+REMOTE_BASE="/home/$REMOTE_USER/PACS/lab6"
 REMOTE_IMAGES="$REMOTE_BASE/images"
 REMOTE_KERNELS="$REMOTE_BASE/kernels"
 REMOTE_LOGS="$REMOTE_BASE/logs"
@@ -43,6 +43,6 @@ if [ ! -d "$LOCAL_LOGS" ]; then mkdir -p "$LOCAL_LOGS"; fi
 if [ ! -d "$LOCAL_OUTPUT" ]; then mkdir -p "$LOCAL_OUTPUT"; fi
 
 sshpass -p "$REMOTE_PASSWORD" rsync -av --ignore-existing "$REMOTE_USER@$REMOTE_HOST:$REMOTE_LOGS/" "$LOCAL_LOGS/"
-sshpass -p "$REMOTE_PASSWORD" rsync -av "$REMOTE_USER@$REMOTE_HOST:$REMOTE_OUTPUT/" "$LOCAL_OUTPUT/"
+sshpass -p "$REMOTE_PASSWORD" rsync -av --ignore-existing "$REMOTE_USER@$REMOTE_HOST:$REMOTE_OUTPUT/" "$LOCAL_OUTPUT/"
 
 echo "Synchronization completed."

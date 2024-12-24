@@ -31,18 +31,12 @@ if ! command -v sshpass &> /dev/null; then
     exit 1
 fi
 
-# Upload ./images, ./kernels and root files to the remote machine
-echo "Uploading images and kernels to the remote machine..."
-sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_IMAGES" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
-sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_KERNELS" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
-sshpass -p "$REMOTE_PASSWORD" scp -r "$LOCAL_BASE"/* "$REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
-
 # Download logs and results from the remote machine without overwriting
 echo "Downloading logs and results from the remote machine..."
 if [ ! -d "$LOCAL_LOGS" ]; then mkdir -p "$LOCAL_LOGS"; fi
 if [ ! -d "$LOCAL_OUTPUT" ]; then mkdir -p "$LOCAL_OUTPUT"; fi
 
 sshpass -p "$REMOTE_PASSWORD" rsync -av --ignore-existing "$REMOTE_USER@$REMOTE_HOST:$REMOTE_LOGS/" "$LOCAL_LOGS/"
-sshpass -p "$REMOTE_PASSWORD" rsync -av "$REMOTE_USER@$REMOTE_HOST:$REMOTE_OUTPUT/" "$LOCAL_OUTPUT/"
+sshpass -p "$REMOTE_PASSWORD" rsync -av  "$REMOTE_USER@$REMOTE_HOST:$REMOTE_OUTPUT/" "$LOCAL_OUTPUT/"
 
 echo "Synchronization completed."

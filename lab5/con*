@@ -1,0 +1,6 @@
+Program Parameters: Input Image: ./images/poster.pgm, Output Image: ./output/gaussian_filter.jpg, Kernel File: ./kernels/kernel_gaussian.txt
+Execution Time (Total): 500.984 ms
+Execution Time (Kernel): 416.994 ms
+Memory Bandwidth: 2.3982 MB/s
+Kernel Throughput: 628651 GFLOPS
+Memory Footprint: 1.00003 MB
