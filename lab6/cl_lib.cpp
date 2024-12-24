@@ -265,7 +265,7 @@ public:
 
     std::vector<std::vector<float>> convolution(
             const std::vector<std::vector<float>> &matrix, 
-            const std::vector<std::vector<float>> &kernel)
+            const std::vector<std::vector<float>> &kernel, double &communicationTime, double &computationTime)
     {
         std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
         std::vector<float> flattenKernel(kernel.size()*kernel[0].size());
@@ -287,7 +287,7 @@ public:
         size_t count = matrix.size()*matrix[0].size();                 
         Cl_function f = createFunction("convolution", s_convolution());
 
-        auto flatten_result = runConvolutionFunction(f, flattenMatrix, flattenKernel, matrix[0].size(), matrix[1].size(), kernel[0].size(), kernel[1].size());
+        auto flatten_result = runConvolutionFunction(f, flattenMatrix, flattenKernel, matrix[0].size(), matrix[1].size(), kernel[0].size(), kernel[1].size(), communicationTime, computationTime);
     
         std::vector<std::vector<float>> result(matrix.size(), std::vector<float>(matrix[0].size()));
 
@@ -302,12 +302,14 @@ public:
 
     std::vector<float> runConvolutionFunction(Cl_function &f, std::vector<float> &matrix,
             std::vector<float> &kernel,
-             size_t rows, size_t cols, size_t kernel_rows, size_t kernel_cols)
+             size_t rows, size_t cols, size_t kernel_rows, size_t kernel_cols, double &communicationTime, double &computationTime)
     {
         cl_int err;
         size_t count = rows * cols;
         size_t kernel_count = kernel_rows * kernel_cols;
         std::vector<float> out(count);
+
+        auto start_comm = std::chrono::high_resolution_clock::now();
 
         cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
         cl_error(err, "Failed to create buffer\n");
@@ -339,8 +341,15 @@ public:
         err = clEnqueueWriteBuffer(queue, kernel_buffer, CL_TRUE, 0, sizeof(float) * kernel_count, kernel.data(), 0, NULL, NULL);
         cl_error(err, "Failed to write buffer\n");
 
+        auto end_comm = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> comm_duration = end_comm - start_comm;
+        communicationTime += comm_duration.count();
+            
         // Enqueue kernel execution
         size_t global_work_size[2] = {rows, cols};
+
+        auto start_compute = std::chrono::high_resolution_clock::now();
+
         err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
         cl_error(err, "Failed to enqueue kernel\n");
 
@@ -356,8 +365,32 @@ public:
         clReleaseMemObject(output);
         clReleaseMemObject(kernel_buffer);
 
+        auto end_compute = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> compute_duration = end_compute - start_compute;
+        computationTime += compute_duration.count();
+
         return out;
     }
+
+    std::string s_pow2() const
+    {
+        std::string pow2_code = "__kernel void pow2("
+            "__global float *in,"
+            "__global float *out,"
+            "const unsigned int rows,"
+            "const unsigned int cols) {"
+
+            "int row = get_global_id(0);"
+            "int col = get_global_id(1);"
+
+            "if (row < rows && col < cols) {"
+            "    out[row * cols + col] = in[row * cols + col] * in[row * cols + col];"
+            "}"
+        "}"; 
+
+        return pow2_code;
+    }
+
 
     std::vector<std::vector<float>> pow2(std::vector<std::vector<float>> &matrix)
     {
@@ -371,22 +404,7 @@ public:
 
         cl_int err;
 
-
-        std::string s = "__kernel void pow2("
-            "__global float *in,"
-            "__global float *out,"
-            "const unsigned int rows,"
-            "const unsigned int cols) {"
-
-            "int row = get_global_id(0);"
-            "int col = get_global_id(1);"
-
-            "if (row < rows && col < cols) {"
-            "    out[row * cols + col] = in[row * cols + col] * in[row * cols + col];"
-            "}"
-        "}";
-
-        Cl_function f = createFunction("pow2", s);
+        Cl_function f = createFunction("pow2", s_pow2());
 
         size_t count = matrix.size()*matrix[0].size();
 
@@ -445,7 +463,27 @@ public:
         return out;
     }
 
-std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix, std::vector<std::vector<float>> &matrix2)
+
+    std::string s_sumSqrt() const
+    {
+        std::string sumSqrt_code = "__kernel void sumSqrt("
+            "__global float *in,"
+            "__global float *in2,"
+            "__global float *out,"
+            "const unsigned int rows,"
+            "const unsigned int cols) {"
+
+            "int row = get_global_id(0);"
+            "int col = get_global_id(1);"
+
+            "if (row < rows && col < cols) {"
+            "  out[row * cols + col] = sqrt(in[row * cols + col] + in2[row * cols + col]);"
+            "}"
+        "}";
+        return sumSqrt_code;
+    }
+
+    std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix, std::vector<std::vector<float>> &matrix2)
     {
         std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
         std::vector<float> flattenMatrix2(matrix2.size()*matrix2[0].size());
@@ -464,23 +502,7 @@ std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix,
 
         cl_int err;
 
-
-        std::string s = "__kernel void sumSqrt("
-            "__global float *in,"
-            "__global float *in2,"
-            "__global float *out,"
-            "const unsigned int rows,"
-            "const unsigned int cols) {"
-
-            "int row = get_global_id(0);"
-            "int col = get_global_id(1);"
-
-            "if (row < rows && col < cols) {"
-            "  out[row * cols + col] = sqrt(in[row * cols + col] + in2[row * cols + col]);"
-            "}"
-        "}";
-
-        Cl_function f = createFunction("sumSqrt", s);
+        Cl_function f = createFunction("sumSqrt", s_sumSqrt());
 
         size_t count = matrix.size()*matrix[0].size();
 
@@ -546,7 +568,28 @@ std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix,
         return out;
     }
 
-    std::vector<std::vector<float>> gradientMagnitudes(std::vector<std::vector<float>> &matrix, std::vector<std::vector<float>> &matrix2)
+
+    std::string s_gradientMagnitudes() const
+    {
+        std::string gradientMagnitudes_code = "__kernel void gradientMagnitudes("
+            "__global float *in,"
+            "__global float *in2,"
+            "__global float *out,"
+            "const unsigned int rows,"
+            "const unsigned int cols) {"
+
+            "int row = get_global_id(0);"
+            "int col = get_global_id(1);"
+
+            "if (row < rows && col < cols) {"
+            "  out[row * cols + col] = sqrt((in[row * cols + col]*in[row * cols + col]) + (in2[row * cols + col]*in2[row * cols + col]));"
+            "}"
+        "}";
+        return gradientMagnitudes_code;
+    }
+
+    std::vector<std::vector<float>> gradientMagnitudes(std::vector<std::vector<float>> &matrix, std::vector<std::vector<float>> &matrix2,
+                                                    double &communicationTime, double &computationTime)
     {
         std::vector<float> flattenMatrix(matrix.size()*matrix[0].size());
         std::vector<float> flattenMatrix2(matrix2.size()*matrix2[0].size());
@@ -565,27 +608,11 @@ std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix,
 
         cl_int err;
 
-
-        std::string s = "__kernel void gradientMagnitudes("
-            "__global float *in,"
-            "__global float *in2,"
-            "__global float *out,"
-            "const unsigned int rows,"
-            "const unsigned int cols) {"
-
-            "int row = get_global_id(0);"
-            "int col = get_global_id(1);"
-
-            "if (row < rows && col < cols) {"
-            "  out[row * cols + col] = sqrt((in[row * cols + col]*in[row * cols + col]) + (in2[row * cols + col]*in2[row * cols + col]));"
-            "}"
-        "}";
-
-        Cl_function f = createFunction("gradientMagnitudes", s);
+        Cl_function f = createFunction("gradientMagnitudes", s_gradientMagnitudes());
 
         size_t count = matrix.size()*matrix[0].size();
 
-        auto flatten_result = runGradientMagnitudes(f, flattenMatrix, flattenMatrix2, matrix.size(), matrix[0].size(), matrix[0].size()/2, matrix[1].size()/2);
+        auto flatten_result = runGradientMagnitudes(f, flattenMatrix, flattenMatrix2, matrix.size(), matrix[0].size(), communicationTime, computationTime);
     
         std::vector<std::vector<float>> result(matrix.size(), std::vector<float>(matrix[0].size()));
 
@@ -599,12 +626,14 @@ std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix,
     }
 
     std::vector<float> runGradientMagnitudes(Cl_function &f, std::vector<float> &in, std::vector<float> &in2, 
-            size_t rows, size_t cols,
-            size_t thX, size_t thY)
+            size_t rows, size_t cols, double &communicationTime, double &computationTime)
     {
         cl_int err;
         size_t count = rows*cols;
         std::vector<float> out(count);
+
+
+        auto start_comm = std::chrono::high_resolution_clock::now();
 
         cl_mem input = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * count, NULL, &err);
         cl_error(err, "Failed to create buffer\n");
@@ -629,9 +658,17 @@ std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix,
 
         err = clEnqueueWriteBuffer(queue, input2, CL_TRUE, 0, sizeof(float) * count, in2.data(), 0, NULL, NULL);
         cl_error(err, "Failed to write buffer\n");
-        
+
+
+        auto end_comm = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> comm_duration = end_comm - start_comm;
+        communicationTime += comm_duration.count();
+            
         // Launch 2d kernel
         size_t global_work_size[2] = {rows, cols};
+
+        auto start_compute = std::chrono::high_resolution_clock::now();
+
         err = clEnqueueNDRangeKernel(queue, f.get(), 2, NULL, global_work_size, NULL, 0, NULL, NULL);
         cl_error(err, "Failed to enqueue kernel\n");
 
@@ -643,6 +680,10 @@ std::vector<std::vector<float>> sumSqrt(std::vector<std::vector<float>> &matrix,
         clReleaseMemObject(input);
         clReleaseMemObject(input2);
         clReleaseMemObject(output);
+
+        auto end_compute = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> compute_duration = end_compute - start_compute;
+        computationTime += compute_duration.count();
 
         return out;
     }
