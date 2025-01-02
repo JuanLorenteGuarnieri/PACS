@@ -25,7 +25,7 @@ int main()
 	std::vector<float> v1 = ...;
 	std::vector<float> v2 = ...;
 
-	auto kernel = ...;
+	auto kernel = ...; // Compile k_dotprod
 	uint nElems = v1.size();
 	uint nWorkGroups = ...; // Something to close to the CUs in the GPU or CPU cores
 
